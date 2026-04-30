@@ -1,0 +1,27 @@
+# Binaries
+bin/
+tmp/
+
+# Logs
+logs/
+
+# Environment
+.env
+
+# Go
+vendor/
+*.test
+*.out
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# SQLC generated (commit these — they are the source of truth for the DB layer)
+# internal/db/repository/  ← do NOT ignore this
