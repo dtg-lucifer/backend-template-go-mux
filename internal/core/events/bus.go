@@ -5,18 +5,7 @@ package events
 
 import "sync"
 
-// UserRegisteredPayload is emitted after a new user account is created.
-type UserRegisteredPayload struct {
-	UserID string
-	Email  string
-}
-
-// JobEnqueuedPayload is emitted after a job is published to the queue.
-type JobEnqueuedPayload struct {
-	Queue   string
-	JobName string
-	JobID   string
-}
+// ── Bus ───────────────────────────────────────────────────────────────────────
 
 // Bus is a goroutine-safe in-process pub/sub bus.
 // Listeners are called synchronously in the goroutine that calls Emit.

@@ -44,7 +44,8 @@ install-migrate:
 .PHONY: install-lint
 install-lint:
 	@echo ">> Installing golangci-lint…"
-	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh | sh -s -- -b $$(go env GOPATH)/bin v2.1.6
+	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh \
+		| sh -s -- -b $$(go env GOPATH)/bin v2.11.4
 
 # ── Build ──────────────────────────────────────────────────────────────────────
 .PHONY: build
@@ -81,7 +82,8 @@ lint:
 fmt:
 	@echo ">> Formatting…"
 	$(GO) fmt ./...
-	gofmt -s -w $(GO_FILES)
+	@echo ">> Running GFMT in hidden mode"
+	@gofmt -s -w $(GO_FILES)
 
 # ── SQLC code generation ───────────────────────────────────────────────────────
 .PHONY: sqlc-gen

@@ -30,7 +30,7 @@ func NewLogger() *Logger {
 	}
 
 	// Open (or create) the log file in append mode
-	f, err := os.OpenFile("logs/app.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o666)
+	f, err := os.OpenFile("logs/app.jsonl", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o666)
 	if err != nil {
 		slog.Error("Failed to open log file", "error", err)
 		return nil
@@ -38,12 +38,12 @@ func NewLogger() *Logger {
 
 	l.file = f
 	l.FileLogger = slog.New(slog.NewJSONHandler(f, &slog.HandlerOptions{
-		AddSource: true,
-		Level:     slog.LevelDebug, // File always captures everything
+		// AddSource: true,
+		Level: slog.LevelDebug, // File always captures everything
 	}))
 	l.StdoutLogger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-		AddSource: true,
-		Level:     slog.LevelInfo, // Console level is overridden at server startup
+		// AddSource: true,
+		Level: slog.LevelInfo, // Console level is overridden at server startup
 	}))
 
 	return l

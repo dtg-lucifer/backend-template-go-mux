@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/your-username/go-mux-backend-template/config"
 	"github.com/your-username/go-mux-backend-template/internal/core/cache"
@@ -19,6 +20,7 @@ import (
 	"github.com/your-username/go-mux-backend-template/internal/core/queue"
 	"github.com/your-username/go-mux-backend-template/internal/core/realtime"
 	"github.com/your-username/go-mux-backend-template/internal/db"
+	"github.com/your-username/go-mux-backend-template/internal/db/repository"
 	"github.com/your-username/go-mux-backend-template/internal/middlewares"
 	"github.com/your-username/go-mux-backend-template/internal/modules"
 	"github.com/your-username/go-mux-backend-template/pkg"
@@ -130,6 +132,7 @@ func (s *Server) setupRealtime() {
 		s.cfg.Security.CORS.Origins,
 		s.cfg.Realtime.WebSocket.ReadBufferSize,
 		s.cfg.Realtime.WebSocket.WriteBufferSize,
+		s.logger,
 	)
 	s.logger.Info("[WS] WebSocket hub ready", "path", s.cfg.Realtime.WebSocket.Path)
 }
@@ -149,14 +152,14 @@ func (s *Server) setupQueue(ctx context.Context) error {
 		URL:             s.cfg.AMQPUrl(),
 		DefaultAttempts: s.cfg.Queue.RabbitMQ.DefaultAttempts,
 		DefaultBackoff:  backoff,
-	})
+	}, s.logger)
 	if err != nil {
 		return fmt.Errorf("queue setup failed: %w", err)
 	}
 	s.qmgr = mgr
 
 	if s.cfg.Workers.Process.Enabled && s.cfg.Workers.NotificationJobs.Enabled {
-		if err := s.qmgr.ConsumeWelcomeEmails(ctx, s.cfg.Workers.NotificationJobs.Concurrency, processWelcomeEmail); err != nil {
+		if err := s.qmgr.ConsumeWelcomeEmails(ctx, s.cfg.Workers.NotificationJobs.Concurrency, processWelcomeEmail(s.logger)); err != nil {
 			return fmt.Errorf("starting email consumer: %w", err)
 		}
 		s.logger.Info("[QUEUE] Email job consumer started",
@@ -170,6 +173,42 @@ func (s *Server) setupQueue(ctx context.Context) error {
 }
 
 func (s *Server) setupEventHandlers() {
+	// ── Async audit log writer ─────────────────────────────────────────────────
+	// The listener spawns a goroutine so the emitting handler never waits for
+	// the DB write. If the write fails it is logged but not retried — audit logs
+	// are best-effort and must never block the request path.
+	repo := repository.New(s.pool)
+	s.bus.OnAuditLog(func(p events.AuditLogPayload) {
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+
+			var actorID pgtype.UUID
+			if p.ActorUserID != "" {
+				_ = actorID.Scan(p.ActorUserID)
+			}
+
+			var ip, ua pgtype.Text
+			_ = ip.Scan(p.IP)
+			_ = ua.Scan(p.UserAgent)
+
+			_, err := repo.CreateAuditLog(ctx, repository.CreateAuditLogParams{
+				ActorUserID: actorID,
+				Action:      p.Action,
+				Entity:      p.Entity,
+				Metadata:    p.Metadata,
+				Ip:          ip,
+				UserAgent:   ua,
+			})
+			if err != nil {
+				s.logger.Error("[AUDIT] Failed to write audit log", "error", err,
+					"action", p.Action, "actor", p.ActorUserID)
+			}
+		}()
+	})
+	s.logger.Info("[AUDIT] Async audit log listener registered")
+
+	// ── Queue-backed event handlers ────────────────────────────────────────────
 	if s.qmgr == nil {
 		s.logger.Info("[EVENTS] Queue-backed event handlers are disabled (no queue)")
 		return
@@ -285,8 +324,10 @@ func (s *Server) Shutdown() {
 
 // processWelcomeEmail is the handler called by the queue consumer for each
 // welcome email job. Replace the body with a real email send in production.
-func processWelcomeEmail(job queue.WelcomeEmailJob) error {
-	// TODO: call your email service here, e.g. mailer.SendWelcome(job.Email)
-	pkg.NewLogger().Info("[WORKER] Sending welcome email", "user_id", job.UserID, "email", job.Email)
-	return nil
+func processWelcomeEmail(logger *pkg.Logger) func(queue.WelcomeEmailJob) error {
+	return func(job queue.WelcomeEmailJob) error {
+		// TODO: call your email service here, e.g. mailer.SendWelcome(job.Email)
+		logger.Info("[WORKER] Sending welcome email", "user_id", job.UserID, "email", job.Email)
+		return nil
+	}
 }

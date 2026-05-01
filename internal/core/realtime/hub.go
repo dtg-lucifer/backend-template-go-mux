@@ -4,13 +4,13 @@ package realtime
 
 import (
 	"encoding/json"
-	"log/slog"
 	"net/http"
 	"sync"
 
 	"github.com/gorilla/websocket"
 	"github.com/your-username/go-mux-backend-template/internal/core/events"
 	"github.com/your-username/go-mux-backend-template/internal/utils"
+	"github.com/your-username/go-mux-backend-template/pkg"
 )
 
 // Hub maintains the set of active WebSocket clients and broadcasts messages to them.
@@ -18,13 +18,15 @@ type Hub struct {
 	mu       sync.RWMutex
 	clients  map[*client]struct{}
 	upgrader websocket.Upgrader
+	logger   *pkg.Logger
 }
 
 // NewHub creates a Hub and wires it to the domain event bus.
 // origins is the list of allowed WebSocket origins from config.yaml.
-func NewHub(bus *events.Bus, origins []string, readBuf, writeBuf int) *Hub {
+func NewHub(bus *events.Bus, origins []string, readBuf, writeBuf int, logger *pkg.Logger) *Hub {
 	h := &Hub{
 		clients: make(map[*client]struct{}),
+		logger:  logger,
 		upgrader: websocket.Upgrader{
 			ReadBufferSize:  readBuf,
 			WriteBufferSize: writeBuf,
@@ -57,14 +59,14 @@ func NewHub(bus *events.Bus, origins []string, readBuf, writeBuf int) *Hub {
 func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	conn, err := h.upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		slog.Error("[WS] Upgrade failed", "error", err)
+		h.logger.Error("[WS] Upgrade failed", "error", err)
 		return
 	}
 
 	c := &client{hub: h, conn: conn, send: make(chan []byte, 256)}
 	h.register(c)
 
-	slog.Info("[WS] Client connected",
+	h.logger.Info("[WS] Client connected",
 		"remote", conn.RemoteAddr().String(),
 		"request_id", w.Header().Get("X-Request-ID"),
 	)
@@ -82,7 +84,7 @@ func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (h *Hub) Broadcast(event string, payload any) {
 	frame, err := marshalFrame(event, payload)
 	if err != nil {
-		slog.Error("[WS] Failed to marshal broadcast frame", "event", event, "error", err)
+		h.logger.Error("[WS] Failed to marshal broadcast frame", "event", event, "error", err)
 		return
 	}
 
@@ -92,7 +94,7 @@ func (h *Hub) Broadcast(event string, payload any) {
 		select {
 		case c.send <- frame:
 		default:
-			slog.Warn("[WS] Dropping message for slow client", "remote", c.conn.RemoteAddr())
+			h.logger.Warn("[WS] Dropping message for slow client", "remote", c.conn.RemoteAddr())
 		}
 	}
 }
@@ -115,7 +117,7 @@ func (h *Hub) unregister(c *client) {
 	delete(h.clients, c)
 	h.mu.Unlock()
 	close(c.send)
-	slog.Info("[WS] Client disconnected", "remote", c.conn.RemoteAddr().String())
+	h.logger.Info("[WS] Client disconnected", "remote", c.conn.RemoteAddr().String())
 }
 
 type client struct {
@@ -137,7 +139,7 @@ func (c *client) readPump() {
 				websocket.CloseGoingAway,
 				websocket.CloseAbnormalClosure,
 			) {
-				slog.Warn("[WS] Unexpected close", "error", err)
+				c.hub.logger.Warn("[WS] Unexpected close", "error", err)
 			}
 			break
 		}
@@ -149,7 +151,7 @@ func (c *client) writePump() {
 	defer c.conn.Close()
 	for msg := range c.send {
 		if err := c.conn.WriteMessage(websocket.TextMessage, msg); err != nil {
-			slog.Warn("[WS] Write error", "error", err)
+			c.hub.logger.Warn("[WS] Write error", "error", err)
 			return
 		}
 	}

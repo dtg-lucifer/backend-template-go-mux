@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"net/http"
 	"os"
 	"time"
 
@@ -13,7 +14,6 @@ import (
 )
 
 // Service holds the dependencies needed by all auth business logic.
-// It is constructed once in routes.go and shared across all route handlers.
 type Service struct {
 	repo *repository.Queries
 	pool *pgxpool.Pool
@@ -29,7 +29,7 @@ func newService(pool *pgxpool.Pool, bus *events.Bus) *Service {
 }
 
 // Register creates a new user account.
-func (s *Service) Register(ctx context.Context, input RegisterInput) utils.ApiResponse {
+func (s *Service) Register(ctx context.Context, input RegisterInput, r *http.Request) utils.ApiResponse {
 	existing, err := s.repo.GetUserByEmail(ctx, input.Email)
 	if err == nil && existing.ID.Valid {
 		return utils.ApiError("email already registered", nil, 409)
@@ -50,11 +50,17 @@ func (s *Service) Register(ctx context.Context, input RegisterInput) utils.ApiRe
 		return utils.ApiError("failed to create user", err.Error(), 500)
 	}
 
-	// Emit domain event — listeners (queue, websocket) react to this
 	if s.bus != nil {
 		s.bus.EmitUserRegistered(events.UserRegisteredPayload{
 			UserID: user.ID.String(),
 			Email:  user.Email,
+		})
+		s.bus.EmitAuditLog(events.AuditLogPayload{
+			ActorUserID: user.ID.String(),
+			Action:      "register",
+			Entity:      "user",
+			IP:          utils.GetIP(r),
+			UserAgent:   r.UserAgent(),
 		})
 	}
 
@@ -64,7 +70,7 @@ func (s *Service) Register(ctx context.Context, input RegisterInput) utils.ApiRe
 }
 
 // Login authenticates a user and returns access + refresh tokens.
-func (s *Service) Login(ctx context.Context, input LoginInput) utils.ApiResponse {
+func (s *Service) Login(ctx context.Context, input LoginInput, r *http.Request) utils.ApiResponse {
 	user, err := s.repo.GetUserByEmail(ctx, input.Email)
 	if err != nil {
 		return utils.ApiError("invalid credentials", nil, 401)
@@ -84,6 +90,16 @@ func (s *Service) Login(ctx context.Context, input LoginInput) utils.ApiResponse
 		Sign(pkg.StandardClaims(user.ID.String(), 30*24*time.Hour))
 	if err != nil {
 		return utils.ApiError("failed to generate refresh token", err.Error(), 500)
+	}
+
+	if s.bus != nil {
+		s.bus.EmitAuditLog(events.AuditLogPayload{
+			ActorUserID: user.ID.String(),
+			Action:      "login",
+			Entity:      "user",
+			IP:          utils.GetIP(r),
+			UserAgent:   r.UserAgent(),
+		})
 	}
 
 	return utils.ApiSuccess("login successful", map[string]any{
@@ -130,7 +146,6 @@ func (s *Service) RefreshToken(_ context.Context, input RefreshInput) utils.ApiR
 	return utils.ApiSuccess("token refreshed", map[string]any{"access_token": newToken}, 200)
 }
 
-// safeUser strips the password hash before sending user data to the client.
 func safeUser(u repository.User) map[string]any {
 	return map[string]any{
 		"id":         u.ID,

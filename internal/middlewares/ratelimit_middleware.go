@@ -17,10 +17,10 @@ type rateLimitEntry struct {
 // RateLimiter is a simple in-memory, per-IP sliding-window rate limiter.
 // For production use, replace this with a Redis-backed implementation.
 type RateLimiter struct {
-	mu       sync.Mutex
-	entries  map[string]*rateLimitEntry
-	limit    int           // max requests per window
-	window   time.Duration // window duration
+	mu      sync.Mutex
+	entries map[string]*rateLimitEntry
+	limit   int           // max requests per window
+	window  time.Duration // window duration
 }
 
 // NewRateLimiter creates a RateLimiter with the given request limit and time window.

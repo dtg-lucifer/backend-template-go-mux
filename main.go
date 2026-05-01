@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"flag"
-	"log/slog"
 	"os"
 
 	"github.com/joho/godotenv"
@@ -16,17 +15,18 @@ func main() {
 	configPath := flag.String("config", "config.yaml", "path to config file")
 	flag.Parse()
 
+	logger := pkg.NewLogger()
+	defer logger.Close()
+
 	// Load .env — non-fatal if missing (production uses real env vars)
 	if err := godotenv.Load(); err != nil {
-		slog.Warn("No .env file found, relying on environment variables")
+		logger.Warn("No .env file found, relying on environment variables")
 	}
 
-	logger := pkg.NewLogger()
 	if logger == nil {
-		slog.Error("Failed to initialise logger, aborting")
+		logger.Error("Failed to initialise logger, aborting")
 		os.Exit(1)
 	}
-	defer logger.Close()
 
 	cfg, err := config.NewConfig(*configPath)
 	if err != nil {

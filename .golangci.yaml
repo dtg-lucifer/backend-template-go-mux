@@ -1,0 +1,14 @@
+version: "2"
+# ---- Formatter Settings ---------------------------------------------------
+formatters:
+  enable:
+    - gofmt
+  settings:
+    gofmt:
+      simplify: true
+      rewrite-rules:
+        - pattern: 'interface{}'
+          replacement: 'any'
+# ---- Linter Settings ---------------------------------------------------
+linters:
+  default: standard

@@ -2,8 +2,8 @@
 //
 // Feature flags in config.yaml:
 //
-//	queue.rabbitmq.enabled: false           → no AMQP connection is opened
-//	workers.process.enabled: false          → consumer goroutines never start
+//	queue.rabbitmq.enabled: false            → no AMQP connection is opened
+//	workers.process.enabled: false           → consumer goroutines never start
 //	workers.notification_jobs.enabled: false → email jobs are skipped
 package queue
 
@@ -11,10 +11,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
+	"github.com/your-username/go-mux-backend-template/pkg"
 )
 
 const EmailQueue = "email_jobs"
@@ -31,6 +31,7 @@ type Manager struct {
 	conn    *amqp.Connection
 	channel *amqp.Channel
 	cfg     ManagerConfig
+	logger  *pkg.Logger
 }
 
 // ManagerConfig holds the parameters needed to connect and configure the queue.
@@ -40,8 +41,8 @@ type ManagerConfig struct {
 	DefaultBackoff  time.Duration
 }
 
-// New dials RabbitMQ, opens a channel, and declares all queues.
-func New(cfg ManagerConfig) (*Manager, error) {
+// New dials RabbitMQ, opens a channel, declares all queues, and returns a Manager.
+func New(cfg ManagerConfig, logger *pkg.Logger) (*Manager, error) {
 	conn, err := amqp.Dial(cfg.URL)
 	if err != nil {
 		return nil, fmt.Errorf("[QUEUE] failed to connect to RabbitMQ: %w", err)
@@ -53,14 +54,14 @@ func New(cfg ManagerConfig) (*Manager, error) {
 		return nil, fmt.Errorf("[QUEUE] failed to open channel: %w", err)
 	}
 
-	m := &Manager{conn: conn, channel: ch, cfg: cfg}
+	m := &Manager{conn: conn, channel: ch, cfg: cfg, logger: logger}
 
 	if err := m.declareQueues(); err != nil {
 		m.Close()
 		return nil, err
 	}
 
-	slog.Info("[QUEUE] RabbitMQ connected and queues declared")
+	logger.Info("[QUEUE] RabbitMQ connected and queues declared")
 	return m, nil
 }
 
@@ -102,18 +103,18 @@ func (m *Manager) ConsumeWelcomeEmails(ctx context.Context, concurrency int, han
 		return fmt.Errorf("[QUEUE] failed to register consumer: %w", err)
 	}
 
-	slog.Info("[QUEUE] Email job consumer started", "concurrency", concurrency, "queue", EmailQueue)
+	m.logger.Info("[QUEUE] Email job consumer started", "concurrency", concurrency, "queue", EmailQueue)
 
 	for i := 0; i < concurrency; i++ {
 		go func(workerID int) {
 			for {
 				select {
 				case <-ctx.Done():
-					slog.Info("[QUEUE] Worker shutting down", "worker_id", workerID)
+					m.logger.Info("[QUEUE] Worker shutting down", "worker_id", workerID)
 					return
 				case msg, ok := <-msgs:
 					if !ok {
-						slog.Warn("[QUEUE] Delivery channel closed", "worker_id", workerID)
+						m.logger.Warn("[QUEUE] Delivery channel closed", "worker_id", workerID)
 						return
 					}
 					m.processWithRetry(msg, handler, workerID)
@@ -128,21 +129,21 @@ func (m *Manager) ConsumeWelcomeEmails(ctx context.Context, concurrency int, han
 func (m *Manager) processWithRetry(msg amqp.Delivery, handler func(WelcomeEmailJob) error, workerID int) {
 	var job WelcomeEmailJob
 	if err := json.Unmarshal(msg.Body, &job); err != nil {
-		slog.Error("[QUEUE] Failed to unmarshal job", "worker_id", workerID, "error", err)
+		m.logger.Error("[QUEUE] Failed to unmarshal job", "worker_id", workerID, "error", err)
 		msg.Nack(false, false)
 		return
 	}
 
-	slog.Info("[QUEUE] Processing email job", "worker_id", workerID, "user_id", job.UserID, "email", job.Email)
+	m.logger.Info("[QUEUE] Processing email job", "worker_id", workerID, "user_id", job.UserID, "email", job.Email)
 
 	if err := handler(job); err != nil {
-		slog.Error("[QUEUE] Job failed", "worker_id", workerID, "error", err)
+		m.logger.Error("[QUEUE] Job failed", "worker_id", workerID, "error", err)
 		msg.Nack(false, true)
 		return
 	}
 
 	msg.Ack(false)
-	slog.Info("[QUEUE] Job completed", "worker_id", workerID, "user_id", job.UserID)
+	m.logger.Info("[QUEUE] Job completed", "worker_id", workerID, "user_id", job.UserID)
 }
 
 // Close gracefully closes the channel and connection.
@@ -153,5 +154,5 @@ func (m *Manager) Close() {
 	if m.conn != nil {
 		m.conn.Close()
 	}
-	slog.Info("[QUEUE] RabbitMQ connection closed")
+	m.logger.Info("[QUEUE] RabbitMQ connection closed")
 }

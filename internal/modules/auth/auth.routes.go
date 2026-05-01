@@ -29,11 +29,11 @@ func RegisterRoutes(r *mux.Router, pool *pgxpool.Pool, bus *events.Bus) {
 	sub.Handle("/login",
 		middlewares.Validate[LoginInput](http.HandlerFunc(login(svc))),
 	).Methods(http.MethodPost)
-	
+
 	sub.Handle("/refresh",
-	middlewares.Validate[RefreshInput](http.HandlerFunc(refresh(svc))),
+		middlewares.Validate[RefreshInput](http.HandlerFunc(refresh(svc))),
 	).Methods(http.MethodPost)
-	
+
 	sub.Handle("/me",
 		auth.Guard(http.HandlerFunc(me(svc))),
 	).Methods(http.MethodGet)
@@ -42,14 +42,14 @@ func RegisterRoutes(r *mux.Router, pool *pgxpool.Pool, bus *events.Bus) {
 func register(svc *Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		input := middlewares.BodyFromContext[RegisterInput](r.Context())
-		utils.SendResponse(w, svc.Register(r.Context(), input))
+		utils.SendResponse(w, svc.Register(r.Context(), input, r))
 	}
 }
 
 func login(svc *Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		input := middlewares.BodyFromContext[LoginInput](r.Context())
-		utils.SendResponse(w, svc.Login(r.Context(), input))
+		utils.SendResponse(w, svc.Login(r.Context(), input, r))
 	}
 }
 

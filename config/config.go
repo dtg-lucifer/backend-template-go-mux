@@ -88,11 +88,11 @@ type Logging struct {
 	// Level controls the minimum level emitted to the console.
 	// Valid: "debug" | "info" | "warn" | "error"
 	// File transports always capture everything regardless of this setting.
-	Level         string `yaml:"level"`
-	Format        string `yaml:"format"`         // "json" | "text"
-	EnableColors  bool   `yaml:"enable_colors"`
-	LogRequests   bool   `yaml:"log_requests"`
-	LogErrors     bool   `yaml:"log_errors"`
+	Level        string `yaml:"level"`
+	Format       string `yaml:"format"` // "json" | "text"
+	EnableColors bool   `yaml:"enable_colors"`
+	LogRequests  bool   `yaml:"log_requests"`
+	LogErrors    bool   `yaml:"log_errors"`
 }
 
 // ── Middlewares ───────────────────────────────────────────────────────────────
@@ -110,9 +110,9 @@ type RequestIDMiddleware struct {
 }
 
 type BodyParserMiddleware struct {
-	Enabled          bool   `yaml:"enabled"`
-	JSONLimitBytes   int64  `yaml:"json_limit_bytes"`
-	MaxBodySizeBytes int64  `yaml:"max_body_size_bytes"`
+	Enabled          bool  `yaml:"enabled"`
+	JSONLimitBytes   int64 `yaml:"json_limit_bytes"`
+	MaxBodySizeBytes int64 `yaml:"max_body_size_bytes"`
 }
 
 type DependencyInjectionMiddleware struct {
@@ -131,7 +131,7 @@ type Realtime struct {
 
 type WebSocketConfig struct {
 	Enabled         bool   `yaml:"enabled"`
-	Path            string `yaml:"path"`            // e.g. "/ws"
+	Path            string `yaml:"path"` // e.g. "/ws"
 	ReadBufferSize  int    `yaml:"read_buffer_size"`
 	WriteBufferSize int    `yaml:"write_buffer_size"`
 }
@@ -154,15 +154,15 @@ type Queue struct {
 }
 type RabbitMQConfig struct {
 	Enabled         bool   `yaml:"enabled"`
-	DefaultAttempts int    `yaml:"default_attempts"`  // retry count on failure
-	DefaultBackoff  string `yaml:"default_backoff"`   // e.g. "1s", "500ms"
+	DefaultAttempts int    `yaml:"default_attempts"` // retry count on failure
+	DefaultBackoff  string `yaml:"default_backoff"`  // e.g. "1s", "500ms"
 }
 
 // ── Workers ───────────────────────────────────────────────────────────────────
 
 type Workers struct {
-	Process           WorkerProcess           `yaml:"process"`
-	NotificationJobs  NotificationJobsWorker  `yaml:"notification_jobs"`
+	Process          WorkerProcess          `yaml:"process"`
+	NotificationJobs NotificationJobsWorker `yaml:"notification_jobs"`
 }
 
 type WorkerProcess struct {
