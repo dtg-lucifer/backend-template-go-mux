@@ -8,25 +8,74 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/your-username/go-mux-backend-template/internal/core/events"
+	coreutils "github.com/your-username/go-mux-backend-template/internal/core/utils"
 	"github.com/your-username/go-mux-backend-template/internal/db/repository"
 	"github.com/your-username/go-mux-backend-template/internal/utils"
 	"github.com/your-username/go-mux-backend-template/pkg"
 )
 
+// ServiceIface is the contract the controller depends on.
+// Every method must have a matching forwarding method on serviceDebugProxy.
+type ServiceIface interface {
+	Register(ctx context.Context, input RegisterInput, r *http.Request) utils.ApiResponse
+	Login(ctx context.Context, input LoginInput, r *http.Request) utils.ApiResponse
+	Me(ctx context.Context, uid string) utils.ApiResponse
+	RefreshToken(ctx context.Context, input RefreshInput) utils.ApiResponse
+}
+
 // Service holds the dependencies needed by all auth business logic.
+// It holds *repository.Queries directly — no hand-written wrapper.
 type Service struct {
 	repo *repository.Queries
-	pool *pgxpool.Pool
 	bus  *events.Bus
 }
 
-func newService(pool *pgxpool.Pool, bus *events.Bus) *Service {
+// NewService constructs a Service. Prefer WithDebug over calling this directly.
+func NewService(pool *pgxpool.Pool, bus *events.Bus) *Service {
 	return &Service{
 		repo: repository.New(pool),
-		pool: pool,
 		bus:  bus,
 	}
 }
+
+// WithDebug wraps the concrete Service in a debug proxy that logs every method
+// call via the Dispatcher. Always use this from the controller.
+func WithDebug(pool *pgxpool.Pool, bus *events.Bus, logger *pkg.Logger) ServiceIface {
+	svc := NewService(pool, bus)
+	d := coreutils.NewDispatcher(svc, "AuthService", logger)
+	return &serviceDebugProxy{svc: svc, d: d}
+}
+
+// ---- Debug proxy ---------------------------------------------------------------
+
+// serviceDebugProxy implements ServiceIface and forwards every call through
+// the Dispatcher so all method invocations are logged automatically.
+type serviceDebugProxy struct {
+	svc *Service
+	d   *coreutils.Dispatcher
+}
+
+func (p *serviceDebugProxy) Register(ctx context.Context, input RegisterInput, r *http.Request) utils.ApiResponse {
+	results := p.d.Call("Register", ctx, input, r)
+	return results[0].Interface().(utils.ApiResponse)
+}
+
+func (p *serviceDebugProxy) Login(ctx context.Context, input LoginInput, r *http.Request) utils.ApiResponse {
+	results := p.d.Call("Login", ctx, input, r)
+	return results[0].Interface().(utils.ApiResponse)
+}
+
+func (p *serviceDebugProxy) Me(ctx context.Context, uid string) utils.ApiResponse {
+	results := p.d.Call("Me", ctx, uid)
+	return results[0].Interface().(utils.ApiResponse)
+}
+
+func (p *serviceDebugProxy) RefreshToken(ctx context.Context, input RefreshInput) utils.ApiResponse {
+	results := p.d.Call("RefreshToken", ctx, input)
+	return results[0].Interface().(utils.ApiResponse)
+}
+
+// ---- Business logic ------------------------------------------------------------
 
 // Register creates a new user account.
 func (s *Service) Register(ctx context.Context, input RegisterInput, r *http.Request) utils.ApiResponse {
@@ -145,6 +194,8 @@ func (s *Service) RefreshToken(_ context.Context, input RefreshInput) utils.ApiR
 
 	return utils.ApiSuccess("token refreshed", map[string]any{"access_token": newToken}, 200)
 }
+
+// ---- Helpers -------------------------------------------------------------------
 
 func safeUser(u repository.User) map[string]any {
 	return map[string]any{
