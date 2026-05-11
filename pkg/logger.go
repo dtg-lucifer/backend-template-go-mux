@@ -3,8 +3,10 @@
 package pkg
 
 import (
+	"context"
 	"log/slog"
 	"os"
+	"strings"
 )
 
 // Logger wraps two slog.Logger instances — one writing JSON to a file and one writing
@@ -43,7 +45,7 @@ func NewLogger() *Logger {
 	}))
 	l.StdoutLogger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
 		// AddSource: true,
-		Level: slog.LevelInfo, // Console level is overridden at server startup
+		Level: slog.LevelDebug, // Console level is overridden at server startup
 	}))
 
 	return l
@@ -78,7 +80,41 @@ func (l *Logger) Error(msg string, args ...any) {
 }
 
 // Debug logs at DEBUG level to both file and stdout.
+// If stdout isn't configured for DEBUG, fall back to INFO so it still shows.
 func (l *Logger) Debug(msg string, args ...any) {
 	l.FileLogger.Debug(msg, args...)
 	l.StdoutLogger.Debug(msg, args...)
+	if !l.StdoutLogger.Enabled(context.Background(), slog.LevelDebug) {
+		l.StdoutLogger.Info(msg, args...)
+	}
+}
+
+// ConfigureStdout rebuilds the stdout logger with the desired level and format.
+// Valid levels: debug | info | warn | error. Valid formats: text | json.
+func (l *Logger) ConfigureStdout(level, format string) {
+	lvl := parseLevel(level)
+	format = strings.ToLower(strings.TrimSpace(format))
+
+	var handler slog.Handler
+	switch format {
+	case "json":
+		handler = slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: lvl})
+	default:
+		handler = slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: lvl})
+	}
+
+	l.StdoutLogger = slog.New(handler)
+}
+
+func parseLevel(level string) slog.Level {
+	switch strings.ToLower(strings.TrimSpace(level)) {
+	case "debug":
+		return slog.LevelDebug
+	case "warn", "warning":
+		return slog.LevelWarn
+	case "error":
+		return slog.LevelError
+	default:
+		return slog.LevelInfo
+	}
 }

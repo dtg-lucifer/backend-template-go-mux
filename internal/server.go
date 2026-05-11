@@ -249,11 +249,11 @@ func (s *Server) setupRouter() {
 		router.Use(rl.Middleware)
 	}
 	if s.cfg.Middlewares.Logger.Enabled {
-		router.Use(middlewares.LoggerMiddleware)
+		router.Use(middlewares.LoggerMiddleware(s.cfg.Server.Environment))
 	}
 
 	apiRouter := router.PathPrefix(s.cfg.Server.APIPrefix).Subrouter()
-	modules.Register(apiRouter, s.pool, s.redis, s.bus, s.startTime, s.logger)
+	modules.Register(apiRouter, s.pool, s.redis, s.bus, s.startTime)
 
 	s.logger.Info("[ROUTES] Mounted under " + s.cfg.Server.APIPrefix)
 
@@ -322,5 +322,3 @@ func (s *Server) Shutdown() {
 
 	s.logger.Info("[SERVER] Shutdown complete")
 }
-
-

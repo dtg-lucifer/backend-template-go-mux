@@ -7,7 +7,7 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/your-username/go-mux-backend-template/config"
-	"github.com/your-username/go-mux-backend-template/internal/server"
+	server "github.com/your-username/go-mux-backend-template/internal"
 	"github.com/your-username/go-mux-backend-template/pkg"
 )
 

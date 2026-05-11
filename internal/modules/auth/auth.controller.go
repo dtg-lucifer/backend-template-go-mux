@@ -8,7 +8,6 @@ import (
 	"github.com/your-username/go-mux-backend-template/internal/core/events"
 	"github.com/your-username/go-mux-backend-template/internal/middlewares"
 	"github.com/your-username/go-mux-backend-template/internal/utils"
-	"github.com/your-username/go-mux-backend-template/pkg"
 )
 
 // Controller owns the auth subrouter and all auth HTTP handlers.
@@ -16,19 +15,19 @@ import (
 type Controller struct {
 	Router *mux.Router
 
-	svc  ServiceIface
+	svc  *Service
 	auth *middlewares.AuthMiddleware
 }
 
 // NewController constructs a Controller and registers routes on the provided
 // router (or a new router if nil).
-func NewController(router *mux.Router, pool *pgxpool.Pool, bus *events.Bus, logger *pkg.Logger) *Controller {
+func NewController(router *mux.Router, pool *pgxpool.Pool, bus *events.Bus) *Controller {
 	if router == nil {
 		router = mux.NewRouter()
 	}
 	c := &Controller{
 		Router: router,
-		svc:    WithDebug(pool, bus, logger),
+		svc:    NewService(pool, bus),
 		auth:   middlewares.NewAuthMiddleware(),
 	}
 	c.registerRoutes()
