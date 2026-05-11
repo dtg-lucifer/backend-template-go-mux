@@ -16,11 +16,15 @@ import (
 
 // Register mounts every module's routes onto the API subrouter.
 // apiRouter is already scoped to the API prefix (e.g. /api/v1).
-func Register(apiRouter *mux.Router, pool *pgxpool.Pool, redis cache.Cache, bus *events.Bus, startTime time.Time, logger *pkg.Logger) {
-	health.RegisterRoutes(apiRouter, pool, redis, startTime)
+func Register(r *mux.Router, pool *pgxpool.Pool, redis cache.Cache, bus *events.Bus, startTime time.Time, logger *pkg.Logger) {
+	health.RegisterRoutes(r, pool, redis, startTime)
 
-	authCtrl := auth.NewController(pool, bus, logger)
-	apiRouter.PathPrefix("/auth").Handler(authCtrl.Router)
+	auth.NewController(
+		r.PathPrefix("/auth").Subrouter(),
+		pool,
+		bus,
+		logger,
+	)
 
 	// Add new modules here:
 	// userCtrl := user.NewController(pool, bus, logger)

@@ -20,11 +20,14 @@ type Controller struct {
 	auth *middlewares.AuthMiddleware
 }
 
-// NewController constructs a Controller, wires the debug-proxied service,
-// and registers all routes. Always use this — never instantiate directly.
-func NewController(pool *pgxpool.Pool, bus *events.Bus, logger *pkg.Logger) *Controller {
+// NewController constructs a Controller and registers routes on the provided
+// router (or a new router if nil).
+func NewController(router *mux.Router, pool *pgxpool.Pool, bus *events.Bus, logger *pkg.Logger) *Controller {
+	if router == nil {
+		router = mux.NewRouter()
+	}
 	c := &Controller{
-		Router: mux.NewRouter(),
+		Router: router,
 		svc:    WithDebug(pool, bus, logger),
 		auth:   middlewares.NewAuthMiddleware(),
 	}
