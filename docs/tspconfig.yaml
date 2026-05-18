@@ -3,5 +3,5 @@ emit:
 
 options:
   "@typespec/openapi3":
-    emitter-output-dir: "{cwd}/.."
+    emitter-output-dir: "{cwd}"
     output-file: "openapi.yaml"
