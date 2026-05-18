@@ -16,15 +16,16 @@ import (
 
 // Config is the root structure populated from config.yaml.
 type Config struct {
-	Server      Server      `yaml:"server"`
-	Security    Security    `yaml:"security"`
-	Database    Database    `yaml:"database"`
-	Redis       Redis       `yaml:"redis"`
-	Logging     Logging     `yaml:"logging"`
-	Middlewares Middlewares `yaml:"middlewares"`
-	Realtime    Realtime    `yaml:"realtime"`
-	Queue       Queue       `yaml:"queue"`
-	Workers     Workers     `yaml:"workers"`
+	Server        Server        `yaml:"server"`
+	Security      Security      `yaml:"security"`
+	Database      Database      `yaml:"database"`
+	Redis         Redis         `yaml:"redis"`
+	Logging       Logging       `yaml:"logging"`
+	Middlewares   Middlewares   `yaml:"middlewares"`
+	Realtime      Realtime      `yaml:"realtime"`
+	Queue         Queue         `yaml:"queue"`
+	Workers       Workers       `yaml:"workers"`
+	Documentation Documentation `yaml:"documentation"`
 }
 
 // ── Server ────────────────────────────────────────────────────────────────────
@@ -174,6 +175,18 @@ type NotificationJobsWorker struct {
 	Concurrency int  `yaml:"concurrency"`
 }
 
+// ── Documentation ─────────────────────────────────────────────────────────────
+
+type Documentation struct {
+	Swagger SwaggerConfig `yaml:"swagger"`
+}
+
+type SwaggerConfig struct {
+	Enabled     bool   `yaml:"enabled"`
+	Path        string `yaml:"path"`         // e.g. "/docs"
+	OpenAPIFile string `yaml:"openapi_file"` // path to openapi.yaml
+}
+
 // ── Loader ────────────────────────────────────────────────────────────────────
 
 // NewConfig reads the YAML file at path, unmarshals it, applies defaults, and
@@ -253,6 +266,12 @@ func applyDefaults(cfg *Config) {
 	}
 	if cfg.Workers.NotificationJobs.Concurrency == 0 {
 		cfg.Workers.NotificationJobs.Concurrency = 5
+	}
+	if cfg.Documentation.Swagger.Path == "" {
+		cfg.Documentation.Swagger.Path = "/docs"
+	}
+	if cfg.Documentation.Swagger.OpenAPIFile == "" {
+		cfg.Documentation.Swagger.OpenAPIFile = "openapi.yaml"
 	}
 	if cfg.Security.RateLimit.WindowSeconds == 0 {
 		cfg.Security.RateLimit.WindowSeconds = 900

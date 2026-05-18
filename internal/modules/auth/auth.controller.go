@@ -19,14 +19,10 @@ type Controller struct {
 	auth *middlewares.AuthMiddleware
 }
 
-// NewController constructs a Controller and registers routes on the provided
-// router (or a new router if nil).
-func NewController(router *mux.Router, pool *pgxpool.Pool, bus *events.Bus) *Controller {
-	if router == nil {
-		router = mux.NewRouter()
-	}
+// NewController constructs a Controller and registers all routes.
+func NewController(pool *pgxpool.Pool, bus *events.Bus) *Controller {
 	c := &Controller{
-		Router: router,
+		Router: mux.NewRouter(),
 		svc:    NewService(pool, bus),
 		auth:   middlewares.NewAuthMiddleware(),
 	}
@@ -58,7 +54,7 @@ func (c *Controller) registerRoutes() {
 	).Methods(http.MethodGet)
 }
 
-// ---- Handlers (methods on *Controller) -----------------------------------------
+// ---- Handlers ------------------------------------------------------------------
 
 func (c *Controller) register(w http.ResponseWriter, r *http.Request) {
 	input := middlewares.BodyFromContext[RegisterInput](r.Context())

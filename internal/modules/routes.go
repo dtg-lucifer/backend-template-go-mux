@@ -11,18 +11,16 @@ import (
 	"github.com/your-username/go-mux-backend-template/internal/core/events"
 	"github.com/your-username/go-mux-backend-template/internal/modules/auth"
 	"github.com/your-username/go-mux-backend-template/internal/modules/health"
+	"github.com/your-username/go-mux-backend-template/pkg"
 )
 
 // Register mounts every module's routes onto the API subrouter.
 // apiRouter is already scoped to the API prefix (e.g. /api/v1).
-func Register(r *mux.Router, pool *pgxpool.Pool, redis cache.Cache, bus *events.Bus, startTime time.Time) {
-	health.RegisterRoutes(r, pool, redis, startTime)
+func Register(apiRouter *mux.Router, pool *pgxpool.Pool, redis cache.Cache, bus *events.Bus, startTime time.Time, logger *pkg.Logger) {
+	health.RegisterRoutes(apiRouter, pool, redis, startTime)
 
-	auth.NewController(
-		r.PathPrefix("/auth").Subrouter(),
-		pool,
-		bus,
-	)
+	authCtrl := auth.NewController(pool, bus)
+	apiRouter.PathPrefix("/auth").Handler(authCtrl.Router)
 
 	// Add new modules here:
 	// userCtrl := user.NewController(pool, bus)

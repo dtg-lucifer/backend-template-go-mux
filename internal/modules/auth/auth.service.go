@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -26,8 +27,6 @@ func NewService(pool *pgxpool.Pool, bus *events.Bus) *Service {
 		bus:  bus,
 	}
 }
-
-// ---- Business logic ------------------------------------------------------------
 
 // Register creates a new user account.
 func (s *Service) Register(ctx context.Context, input RegisterInput, r *http.Request) utils.ApiResponse {
@@ -66,7 +65,7 @@ func (s *Service) Register(ctx context.Context, input RegisterInput, r *http.Req
 	}
 
 	return utils.ApiSuccess("user registered successfully", map[string]any{
-		"user": utils.SafeUser(user),
+		"user": safeUser(user),
 	}, 201)
 }
 
@@ -81,13 +80,13 @@ func (s *Service) Login(ctx context.Context, input LoginInput, r *http.Request) 
 		return utils.ApiError("invalid credentials", nil, 401)
 	}
 
-	accessToken, err := pkg.NewTokenSigner(utils.GetEnv("JWT_SECRET", "change-me")).
+	accessToken, err := pkg.NewTokenSigner(getenv("JWT_SECRET", "change-me")).
 		Sign(pkg.StandardClaims(user.ID.String(), 24*time.Hour))
 	if err != nil {
 		return utils.ApiError("failed to generate access token", err.Error(), 500)
 	}
 
-	refreshToken, err := pkg.NewTokenSigner(utils.GetEnv("JWT_REFRESH_SECRET", "change-me-refresh")).
+	refreshToken, err := pkg.NewTokenSigner(getenv("JWT_REFRESH_SECRET", "change-me-refresh")).
 		Sign(pkg.StandardClaims(user.ID.String(), 30*24*time.Hour))
 	if err != nil {
 		return utils.ApiError("failed to generate refresh token", err.Error(), 500)
@@ -104,7 +103,7 @@ func (s *Service) Login(ctx context.Context, input LoginInput, r *http.Request) 
 	}
 
 	return utils.ApiSuccess("login successful", map[string]any{
-		"user":          utils.SafeUser(user),
+		"user":          safeUser(user),
 		"access_token":  accessToken,
 		"refresh_token": refreshToken,
 	}, 200)
@@ -122,12 +121,12 @@ func (s *Service) Me(ctx context.Context, uid string) utils.ApiResponse {
 		return utils.ApiError("user not found", nil, 404)
 	}
 
-	return utils.ApiSuccess("ok", map[string]any{"user": utils.SafeUser(user)}, 200)
+	return utils.ApiSuccess("ok", map[string]any{"user": safeUser(user)}, 200)
 }
 
 // RefreshToken validates a refresh token and issues a new access token.
 func (s *Service) RefreshToken(_ context.Context, input RefreshInput) utils.ApiResponse {
-	claims, err := pkg.NewTokenSigner(utils.GetEnv("JWT_REFRESH_SECRET", "change-me-refresh")).
+	claims, err := pkg.NewTokenSigner(getenv("JWT_REFRESH_SECRET", "change-me-refresh")).
 		Verify(input.RefreshToken)
 	if err != nil {
 		return utils.ApiError("invalid or expired refresh token", nil, 401)
@@ -138,11 +137,31 @@ func (s *Service) RefreshToken(_ context.Context, input RefreshInput) utils.ApiR
 		return utils.ApiError("malformed refresh token", nil, 401)
 	}
 
-	newToken, err := pkg.NewTokenSigner(utils.GetEnv("JWT_SECRET", "change-me")).
+	newToken, err := pkg.NewTokenSigner(getenv("JWT_SECRET", "change-me")).
 		Sign(pkg.StandardClaims(uid, 24*time.Hour))
 	if err != nil {
 		return utils.ApiError("failed to generate access token", err.Error(), 500)
 	}
 
 	return utils.ApiSuccess("token refreshed", map[string]any{"access_token": newToken}, 200)
+}
+
+// ---- Helpers -------------------------------------------------------------------
+
+func safeUser(u repository.User) map[string]any {
+	return map[string]any{
+		"id":         u.ID,
+		"first_name": u.FirstName,
+		"last_name":  u.LastName,
+		"email":      u.Email,
+		"verified":   u.Verified,
+		"created_at": u.CreatedAt,
+	}
+}
+
+func getenv(key, def string) string {
+	if v, ok := os.LookupEnv(key); ok {
+		return v
+	}
+	return def
 }

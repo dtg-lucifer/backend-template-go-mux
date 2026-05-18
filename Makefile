@@ -4,6 +4,7 @@ CMD_PATH    := .
 BIN_DIR     := ./bin
 BIN_FILE    := $(BIN_DIR)/$(APP_NAME)
 LOGS_DIR    := ./logs
+DOCS_DIR    := ./docs
 
 ## ── Tools ─────────────────────────────────────────────────────────────────────
 GO              := go
@@ -11,6 +12,7 @@ SQLC            := sqlc
 GOLANGCI_LINT   := golangci-lint
 MIGRATE         := migrate
 AIR             := air
+TSP             := $(DOCS_DIR)/node_modules/.bin/tsp
 
 ## ── DB config (override via env or .env) ──────────────────────────────────────
 DB_URL          ?= postgres://postgres:postgres@localhost:5432/app_db?sslmode=disable
@@ -29,7 +31,7 @@ help: ## Show this help.
 
 # ── Install dev tools ──────────────────────────────────────────────────────────
 .PHONY: install
-install: install-sqlc install-air install-migrate install-lint ## Install all dev tools.
+install: install-sqlc install-air install-migrate install-lint install-docs ## Install all dev tools.
 	@echo ">> All tools installed."
 
 .PHONY: install-sqlc
@@ -50,12 +52,30 @@ install-migrate: ## Install golang-migrate.
 .PHONY: install-lint
 install-lint: ## Install golangci-lint.
 	@echo ">> Installing golangci-lint…"
-	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh \
-		| sh -s -- -b $$(go env GOPATH)/bin v2.11.4
+	@curl -sSfL "https://raw.githubusercontent.com/golangci/golangci-lint/HEAD/install.sh" \
+		| sh -s -- -b $(go env GOPATH)/bin v2.11.4
+
+.PHONY: install-docs
+install-docs: ## Install TypeSpec pnpm dependencies for API docs generation.
+	@echo ">> Installing TypeSpec dependencies…"
+	@pnpm install --prefix $(DOCS_DIR) --silent
+	@echo ">> TypeSpec dependencies installed."
+
+# ── API Docs (TypeSpec → OpenAPI) ─────────────────────────────────────────────
+.PHONY: docs
+docs: ## Compile TypeSpec project and generate openapi.yaml at the root.
+	@echo ">> Compiling TypeSpec → openapi.yaml…"
+	@$(TSP) compile $(DOCS_DIR)/main.tsp
+	@echo ">> openapi.yaml generated."
+
+.PHONY: docs-watch
+docs-watch: ## Watch TypeSpec files and recompile on change (requires tsp watch support).
+	@echo ">> Watching TypeSpec files…"
+	@$(TSP) compile $(DOCS_DIR)/main.tsp --watch
 
 # ── Build ──────────────────────────────────────────────────────────────────────
 .PHONY: build
-build: clean ## Build the binary.
+build: clean docs ## Compile TypeSpec docs then build the Go binary.
 	@echo ">> Building binary…"
 	@mkdir -p $(BIN_DIR)
 	$(GO) build -o $(BIN_FILE) $(CMD_PATH)
@@ -63,13 +83,14 @@ build: clean ## Build the binary.
 
 # ── Run ────────────────────────────────────────────────────────────────────────
 .PHONY: run
-run: build ## Build and run the binary.
+run: build ## Compile docs, build, and run the binary.
 	@echo ">> Running $(APP_NAME)…"
 	$(BIN_FILE)
 
 # ── Dev (hot reload via Air) ───────────────────────────────────────────────────
 .PHONY: dev
-dev: ## Run with hot reload (Air).
+dev: docs ## Compile TypeSpec docs then start the server with hot reload (Air).
+	@echo ">> Starting hot reload…"
 	@$(AIR)
 
 # ── Test ───────────────────────────────────────────────────────────────────────
@@ -147,8 +168,8 @@ migrate-drop: ## Drop all migrations (destructive).
 .PHONY: migrate-new
 migrate-new: ## Create a new migration (prompts for name).
 	@read -p "Migration name: " name; \
-		$(MIGRATE) create -ext sql -dir $(MIGRATIONS_DIR) -seq "$$name"; \
-		echo ">> Created migration: $$name"
+		$(MIGRATE) create -ext sql -dir $(MIGRATIONS_DIR) -seq "$name"; \
+		echo ">> Created migration: $name"
 
 # ── Clean ──────────────────────────────────────────────────────────────────────
 .PHONY: clean

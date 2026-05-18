@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	scalargo "github.com/bdpiprava/scalar-go"
 	"github.com/gorilla/mux"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -73,6 +74,7 @@ func (s *Server) Setup(ctx context.Context) error {
 
 	s.setupEventHandlers()
 	s.setupRouter()
+	s.setupDocs()
 
 	s.logger.Info("[SERVER] Setup completed successfully")
 	return nil
@@ -253,7 +255,7 @@ func (s *Server) setupRouter() {
 	}
 
 	apiRouter := router.PathPrefix(s.cfg.Server.APIPrefix).Subrouter()
-	modules.Register(apiRouter, s.pool, s.redis, s.bus, s.startTime)
+	modules.Register(apiRouter, s.pool, s.redis, s.bus, s.startTime, s.logger)
 
 	s.logger.Info("[ROUTES] Mounted under " + s.cfg.Server.APIPrefix)
 
@@ -270,6 +272,34 @@ func (s *Server) setupRouter() {
 		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  60 * time.Second,
 	}
+}
+
+// setupDocs mounts the Scalar interactive API documentation UI.
+// It reads the OpenAPI spec from the path configured in config.yaml and serves
+// the Scalar UI at the configured path. Disabled when documentation.swagger.enabled is false.
+func (s *Server) setupDocs() {
+	cfg := s.cfg.Documentation.Swagger
+	if !cfg.Enabled {
+		s.logger.Info("[DOCS] API documentation disabled in config.yaml")
+		return
+	}
+
+	s.router.HandleFunc(cfg.Path, func(w http.ResponseWriter, r *http.Request) {
+		html, err := scalargo.NewV2(
+			scalargo.WithSpecDir("."),
+			scalargo.WithBaseFileName(cfg.OpenAPIFile),
+			scalargo.WithTheme(scalargo.ThemeDefault),
+		)
+		if err != nil {
+			s.logger.Error("[DOCS] Failed to generate documentation", "error", err)
+			http.Error(w, "failed to generate API documentation", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		fmt.Fprint(w, html)
+	}).Methods(http.MethodGet)
+
+	s.logger.Info("[DOCS] Scalar API UI mounted", "path", cfg.Path, "spec", cfg.OpenAPIFile)
 }
 
 // Start begins listening for HTTP connections. It blocks until SIGINT or SIGTERM

@@ -91,3 +91,12 @@ workers:
     notification_jobs:
         enabled: true
         concurrency: 5
+
+# ── Documentation (Scalar API UI) ─────────────────────────────────────────────
+# Set enabled: false to disable the interactive API docs entirely.
+# openapi_file: path to the generated OpenAPI spec (relative to the binary).
+documentation:
+    swagger:
+        enabled: true
+        path: /docs
+        openapi_file: openapi.yaml
