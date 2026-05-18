@@ -176,16 +176,17 @@ Interactive docs are at `http://localhost:8080/docs`.
 │       └── http.go                  ApiResponse, SendResponse, HttpWriter
 │
 ├── docs/                            TypeSpec API documentation project
-│   ├── main.tsp                     Service metadata + imports
+│   ├── main.tsp                     Entry point — service metadata + imports
+│   ├── common.tsp                   Shared envelope + error models
 │   ├── tspconfig.yaml               Emitter config (outputs ../openapi.yaml)
 │   ├── package.json                 TypeSpec npm dependencies
-│   ├── models/
-│   │   ├── common.tsp               Shared envelope + error models
-│   │   ├── auth.tsp                 Auth request/response models
-│   │   └── health.tsp               Health check models
-│   └── routes/
-│       ├── auth.tsp                 Auth route definitions
-│       └── health.tsp               Health route definitions
+│   └── modules/
+│       ├── auth/
+│       │   ├── auth.model.tsp       Auth request/response models
+│       │   └── auth.route.tsp       Auth route definitions
+│       └── health/
+│           ├── health.model.tsp     Health check models
+│           └── health.route.tsp     Health route definitions
 │
 ├── scripts/
 │   └── rename-module.sh             Rename the Go module path across the project
@@ -297,8 +298,8 @@ The UI is available at `http://localhost:8080/docs` when `documentation.swagger.
 
 ### Adding docs for a new module
 
-1. `docs/models/<name>.tsp` — request/response models
-2. `docs/routes/<name>.tsp` — route interface, imports from `../models/<name>.tsp`
+1. `docs/modules/<name>/<name>.model.tsp` — request/response models, import `../../common.tsp`
+2. `docs/modules/<name>/<name>.route.tsp` — route interface, import `./<name>.model.tsp`
 3. Add both imports to `docs/main.tsp`
 4. `make docs`
 

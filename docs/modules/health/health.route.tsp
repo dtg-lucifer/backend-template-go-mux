@@ -1,6 +1,6 @@
 import "@typespec/http";
-import "../models/health.tsp";
-import "../models/common.tsp";
+import "./health.model.tsp";
+import "../../common.tsp";
 
 using TypeSpec.Http;
 using Api.Models;

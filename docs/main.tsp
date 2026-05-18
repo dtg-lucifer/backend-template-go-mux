@@ -1,11 +1,9 @@
 import "@typespec/http";
 import "@typespec/openapi";
 import "@typespec/openapi3";
-import "./models/common.tsp";
-import "./models/auth.tsp";
-import "./models/health.tsp";
-import "./routes/auth.tsp";
-import "./routes/health.tsp";
+import "./common.tsp";
+import "./modules/auth/auth.route.tsp";
+import "./modules/health/health.route.tsp";
 
 using TypeSpec.Http;
 using TypeSpec.OpenAPI;

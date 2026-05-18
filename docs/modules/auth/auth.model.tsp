@@ -1,5 +1,5 @@
 import "@typespec/http";
-import "./common.tsp";
+import "../../common.tsp";
 
 using TypeSpec.Http;
 using Api.Models;

@@ -466,18 +466,23 @@ The API is documented using [TypeSpec](https://typespec.io/). TypeSpec compiles 
 
 ```
 docs/
-├── main.tsp              Service metadata, server URL, imports
-├── tspconfig.yaml        Emitter config → outputs ../openapi.yaml
-├── models/
-│   ├── common.tsp        Shared: ApiSuccess<T>, ApiError, error models
-│   ├── auth.tsp          Auth: SafeUser, request bodies, response shapes
-│   └── health.tsp        Health: DatabaseStatus, MemoryStats, HealthData
-└── routes/
-    ├── auth.tsp          Auth route definitions (imports models/auth.tsp)
-    └── health.tsp        Health route definitions (imports models/health.tsp)
+├── main.tsp                        Entry point — service metadata + imports
+├── common.tsp                      Shared: ApiSuccess<T>, ApiError, error models
+├── tspconfig.yaml                  Emitter config → outputs ../openapi.yaml
+└── modules/
+    ├── auth/
+    │   ├── auth.model.tsp          SafeUser, request bodies, response shapes
+    │   └── auth.route.tsp          Route interface (imports auth.model.tsp)
+    └── health/
+        ├── health.model.tsp        DatabaseStatus, MemoryStats, HealthData
+        └── health.route.tsp        Route interface (imports health.model.tsp)
 ```
 
-**Rule:** route files contain only interface definitions. All models live in `docs/models/`.
+**Rules:**
+- Each module folder mirrors the Go module under `internal/modules/<name>/`
+- `<name>.model.tsp` — all models for that module
+- `<name>.route.tsp` — only the route interface; imports its own model file
+- `common.tsp` at the root — shared envelope and error types imported by every model file
 
 ### Workflow
 
@@ -501,10 +506,11 @@ documentation:
 
 ### Adding docs for a new module
 
-1. Create `docs/models/<name>.tsp` — define all request/response models
-2. Create `docs/routes/<name>.tsp` — define the interface, import from `../models/<name>.tsp`
-3. Add both imports to `docs/main.tsp`
-4. `make docs` to regenerate `openapi.yaml`
+1. Create `docs/modules/<name>/` directory
+2. `docs/modules/<name>/<name>.model.tsp` — all request/response models, import `../../common.tsp`
+3. `docs/modules/<name>/<name>.route.tsp` — route interface only, import `./<name>.model.tsp`
+4. Add both imports to `docs/main.tsp`
+5. `make docs` to regenerate `openapi.yaml`
 
 ---
 
@@ -655,7 +661,7 @@ SIGINT / SIGTERM received
    ctrl := name.NewController(pool, bus)
    apiRouter.PathPrefix("/name").Handler(ctrl.Router)
    ```
-7. **Docs** → `docs/models/<name>.tsp` + `docs/routes/<name>.tsp`, import in `docs/main.tsp`
+7. **Docs** → `docs/modules/<name>/<name>.model.tsp` + `docs/modules/<name>/<name>.route.tsp`, import both in `docs/main.tsp`
 8. **Regenerate docs** → `make docs`
 
 ### New migration checklist
