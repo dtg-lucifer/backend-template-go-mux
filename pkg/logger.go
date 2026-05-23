@@ -63,26 +63,26 @@ func (l *Logger) Close() {
 
 // Info logs at INFO level to both file and stdout.
 func (l *Logger) Info(msg string, args ...any) {
-	l.FileLogger.Info(msg, args...)
+	go l.FileLogger.Info(msg, args...)
 	l.StdoutLogger.Info(msg, args...)
 }
 
 // Warn logs at WARN level to both file and stdout.
 func (l *Logger) Warn(msg string, args ...any) {
-	l.FileLogger.Warn(msg, args...)
+	go l.FileLogger.Warn(msg, args...)
 	l.StdoutLogger.Warn(msg, args...)
 }
 
 // Error logs at ERROR level to both file and stdout.
 func (l *Logger) Error(msg string, args ...any) {
-	l.FileLogger.Error(msg, args...)
+	go l.FileLogger.Error(msg, args...)
 	l.StdoutLogger.Error(msg, args...)
 }
 
 // Debug logs at DEBUG level to both file and stdout.
 // If stdout isn't configured for DEBUG, fall back to INFO so it still shows.
 func (l *Logger) Debug(msg string, args ...any) {
-	l.FileLogger.Debug(msg, args...)
+	go l.FileLogger.Debug(msg, args...)
 	l.StdoutLogger.Debug(msg, args...)
 	if !l.StdoutLogger.Enabled(context.Background(), slog.LevelDebug) {
 		l.StdoutLogger.Info(msg, args...)
